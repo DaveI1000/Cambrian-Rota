@@ -4,7 +4,7 @@
 <section id="calendarPage" class="panel"><div class="panel-head"><div><div class="panel-title">Team Calendar</div><div class="panel-sub">Public read-only calendar · Friday–Thursday rota weeks</div></div><div><span class="pill">AL Annual Leave</span> <span class="pill">TR Training</span> <span class="pill">OD Other Duties</span></div></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>Day</th><th>06:00–18:00</th><th>18:00–06:00</th><th>Spare Days</th><th>Spare Nights</th><th>Status / Cover</th></tr></thead><tbody id="calendarBody"></tbody></table></div></section>
 <section id="minePage" class="panel hidden"><div class="panel-head"><div><div class="panel-title">My Shifts</div><div class="panel-sub">Set AL / TR / OD on your own rostered shifts</div></div></div><div id="mineCards" class="cards"></div></section>
 <section id="coverPage" class="panel hidden"><div class="panel-head"><div><div class="panel-title">Available Cover</div><div class="panel-sub">Volunteer once; the database locks the vacancy to the first successful volunteer</div></div></div><div id="coverCards" class="cards"></div></section>
-<section id="setupPage" class="panel hidden"><div class="panel-head"><div><div class="panel-title">My Rota Setup</div><div class="panel-sub">Enter your 13-week repeating pattern and choose the rota week for a Friday</div></div><button id="savePattern" class="primary">Save Pattern</button></div><div class="setup-grid"><div style="margin-bottom:12px"><label><strong>Reference Friday:</strong> <input id="refFriday" class="form-control" type="date"></label> <label><strong>Week number:</strong> <select id="refWeek" class="week-select"></select></label> <button id="saveReference" class="secondary">Save Reference Week</button></div><table><thead><tr><th>Week</th><th>Shift</th><th>Days worked</th></tr></thead><tbody id="patternBody"></tbody></table></div></section>
+<section id="setupPage" class="panel hidden"><div class="panel-head"><div><div class="panel-title">My Rota Setup</div><div class="panel-sub">Enter your 13-week repeating pattern and choose the rota week for a Friday</div></div><button id="savePattern" class="primary">Save Rota</button></div><div class="setup-grid"><div style="margin-bottom:12px"><label><strong>Reference Friday:</strong> <input id="refFriday" class="form-control" type="date"></label> <label><strong>Week number:</strong> <select id="refWeek" class="week-select"></select></label></div><table><thead><tr><th>Week</th><th>Shift</th><th>Days worked</th></tr></thead><tbody id="patternBody"></tbody></table></div></section>
 <section id="historyPage" class="panel hidden"><div class="panel-head"><div><div class="panel-title">History</div><div class="panel-sub">Status, cover and rota changes</div></div></div><div id="historyList" class="history"></div></section>
 <section id="adminPage" class="panel hidden"><div class="panel-head"><div><div class="panel-title">Administration</div><div class="panel-sub">Create users, set access level and reset passwords</div></div><button id="newUser" class="primary">New User</button></div><div id="userList" class="admin-grid"></div></section></main><div id="modalBackdrop" class="modal-backdrop hidden"></div>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script>
@@ -23,7 +23,49 @@ function showPage(p,b){['calendar','mine','cover','setup','history','admin'].for
 function render(){renderTabs();renderCalendar();if(profile){renderMine();renderCover();renderPattern();renderHistory()}$('who').textContent=profile?`${profile.display_name} · ${profile.role==='admin'?'Admin':'User'}`:'Public view';$('loginBtn').classList.toggle('hidden',!!profile);$('logoutBtn').classList.toggle('hidden',!profile)}
 async function setStatus(date,value){let q;if(value)q=await sb.from('rota_status').upsert({person_id:profile.id,shift_date:date,status_code:value,updated_by:profile.id},{onConflict:'person_id,shift_date'});else q=await sb.from('rota_status').delete().eq('person_id',profile.id).eq('shift_date',date);if(q.error)alert(q.error.message);await load()}
 async function coverAction(fn,v){let [p,d]=v.split('|');let {error}=await sb.rpc(fn,{p_rostered_person:p,p_shift_date:d});if(error)alert(error.message);await load()}
-$('savePattern').onclick=async()=>{if(!profile)return;let rows=[];for(let w=1;w<=13;w++){let shift=document.querySelector(`[data-shift="${w}"]`).value,days=[...document.querySelectorAll(`[data-day^="${w}|"]:checked`)].map(x=>x.dataset.day.split('|')[1]);rows.push({person_id:profile.id,week_no:w,shift_type:shift||'Off',days})}let {error}=await sb.from('rota_patterns').upsert(rows,{onConflict:'person_id,week_no'});if(error)alert(error.message);else{alert('Rota pattern saved.');await load()}};$('saveReference').onclick=async()=>{let d=$('refFriday').value;if(day(parse(d))!=='Fri'){alert('Reference date must be a Friday.');return}let {error}=await sb.from('rota_reference').upsert({person_id:profile.id,ref_friday:d,week_no:+$('refWeek').value},{onConflict:'person_id'});if(error)alert(error.message);else{alert('Reference week saved.');await load()}}
+$('savePattern').onclick=async()=>{
+  if(!profile){alert('Please log in first.');return}
+  const btn=$('savePattern');
+  const refFriday=$('refFriday').value;
+  const refWeek=+$('refWeek').value;
+  if(!refFriday||day(parse(refFriday))!=='Fri'){alert('Reference date must be a Friday.');return}
+  let rows=[];
+  for(let w=1;w<=13;w++){
+    let shift=document.querySelector(`[data-shift="${w}"]`).value||'Off';
+    let days=[...document.querySelectorAll(`[data-day^="${w}|"]:checked`)].map(x=>x.dataset.day.split('|')[1]);
+    rows.push({person_id:profile.id,week_no:w,shift_type:shift,days});
+  }
+  btn.disabled=true;btn.textContent='Saving...';
+  try{
+    let patternSave=await sb.from('rota_patterns').upsert(rows,{onConflict:'person_id,week_no'});
+    if(patternSave.error)throw new Error('Pattern save failed: '+patternSave.error.message);
+    let referenceSave=await sb.from('rota_reference').upsert(
+      {person_id:profile.id,ref_friday:refFriday,week_no:refWeek},
+      {onConflict:'person_id'}
+    );
+    if(referenceSave.error)throw new Error('Reference week save failed: '+referenceSave.error.message);
+
+    // Verify the data actually exists in Supabase before reporting success.
+    let verifyPatterns=await sb.from('rota_patterns')
+      .select('week_no,shift_type,days')
+      .eq('person_id',profile.id)
+      .order('week_no');
+    if(verifyPatterns.error)throw new Error('Pattern verification failed: '+verifyPatterns.error.message);
+    let verifyRef=await sb.from('rota_reference')
+      .select('ref_friday,week_no')
+      .eq('person_id',profile.id)
+      .single();
+    if(verifyRef.error)throw new Error('Reference verification failed: '+verifyRef.error.message);
+    if((verifyPatterns.data||[]).length!==13)throw new Error('Only '+(verifyPatterns.data||[]).length+' of 13 rota weeks were saved.');
+
+    await load();
+    alert('Rota saved. Your pattern, Calendar and My Shifts have been updated.');
+  }catch(e){
+    alert(e?.message||String(e));
+  }finally{
+    btn.disabled=false;btn.textContent='Save Rota';
+  }
+};
 function loginModal(){showModal(`<h2>Team Login</h2><p>Calendar viewing does not require a login.</p><label>Email</label><input id="email" type="email"><label>Password</label><input id="password" type="password"><div id="loginError" class="error"></div><div class="modal-actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="doLogin">Login</button></div>`,()=>{$('doLogin').onclick=async()=>{let {data,error}=await sb.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});if(error){$('loginError').textContent=error.message;return}closeModal();session=data.session;await refreshProfile();await load()}})}async function refreshProfile(){if(!session){profile=null;return}let {data,error}=await sb.from('profiles').select('*').eq('id',session.user.id).single();if(error){profile=null;return}profile=data}
 async function adminCall(body){let {data:{session:s}}=await sb.auth.getSession();let r=await fetch(`${cfg.url}/functions/v1/${cfg.adminFn}`,{method:'POST',headers:{apikey:cfg.key,Authorization:`Bearer ${s.access_token}`,'Content-Type':'application/json'},body:JSON.stringify(body)});let t=await r.json().catch(()=>({}));if(!r.ok){alert(t.error||'Admin action failed');return}await load();renderAdmin()}
 function newUserModal(){showModal(`<h2>New Team Member</h2><label>Name</label><input id="newName"><label>Email</label><input id="newEmail" type="email"><label>Password</label><input id="newPass" type="password"><label>Access</label><select id="newRole" class="form-control"><option value="user">User</option><option value="admin">Admin</option></select><div class="modal-actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="createUser">Create</button></div>`,()=>{$('createUser').onclick=async()=>{const body={action:'create',display_name:$('newName').value.trim(),email:$('newEmail').value.trim(),password:$('newPass').value,role:$('newRole').value};closeModal();await adminCall(body)}})}function passwordModal(id){showModal(`<h2>Reset Password</h2><label>New password</label><input id="resetPass" type="password"><div class="modal-actions"><button class="secondary" data-close>Cancel</button><button class="primary" id="resetDo">Set Password</button></div>`,()=>{$('resetDo').onclick=async()=>{let p=$('resetPass').value;closeModal();await adminCall({action:'reset_password',user_id:id,password:p})}})}
