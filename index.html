@@ -5,6 +5,11 @@
 .rota-week-heading{margin:0 0 8px 0;padding:8px 10px;border-left:4px solid var(--brand);background:#f3f5f2;border-radius:6px}
 .rota-week-row .cards{margin-top:0}
 
+
+.previous-shift{background:#e3e3e3!important}
+.previous-week .rota-week-heading{background:#ededed}
+.past-label{font-size:.78em;font-weight:600;margin-left:8px;color:#666}
+
 </style></head><body><main class="app"><header class="topbar"><div class="brand">Cambrian Team Rota</div><nav id="tabs" class="tabs"><button class="tab active" data-page="calendar">Calendar</button></nav><div class="session"><span id="who">Public view</span><button id="loginBtn" class="primary">Login</button><button id="logoutBtn" class="logout hidden">Logout</button></div></header><div id="notice" class="notice bad">Database not configured. Use Setup to connect this app to Supabase. <button id="setupBtn" class="secondary">Setup</button></div>
 <section id="calendarPage" class="panel"><div class="panel-head"><div><div class="panel-title">Team Calendar</div><div class="panel-sub">Public read-only calendar · Friday–Thursday rota weeks</div></div><div><span class="pill">AL Annual Leave</span> <span class="pill">TR Training</span> <span class="pill">OD Other Duties</span></div></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>Day</th><th>06:00–18:00</th><th>18:00–06:00</th><th>Spare Days</th><th>Spare Nights</th><th>Status / Cover</th></tr></thead><tbody id="calendarBody"></tbody></table></div></section>
 <section id="minePage" class="panel hidden"><div class="panel-head"><div><div class="panel-title">My Shifts</div><div class="panel-sub">Set AL / TR / OD on your own rostered shifts</div></div></div><div id="mineCards" class="cards"></div></section>
@@ -20,11 +25,30 @@ function name(id){return people.find(p=>p.id===id)?.display_name||'Unknown'}func
 function renderCalendar(){let h='';for(let d of dates()){h+=`<tr class="${day(parse(d))==='Fri'?'week-start':''}"><td>${disp(d)}</td><td>${day(parse(d))}</td><td class="day">${rotaCell(d,'Day')}</td><td class="night">${rotaCell(d,'Night')}</td><td class="spare">${rotaCell(d,'Spare')}</td><td class="spare">${rotaCell(d,'Spare Night')}</td><td class="status">${statusCell(d)}</td></tr>`}$('calendarBody').innerHTML=h}
 function renderMine(){
   if(!profile)return;
-  const worked=dates().filter(d=>shiftFor(profile.id,d));
+
+  // Show the current rota week, all future generated shifts, and up to
+  // 8 previous Friday-Thursday rota weeks (two 4-week payment cycles).
+  const today=new Date();today.setHours(0,0,0,0);
+  const todayDow=today.getDay();
+  const currentFriday=new Date(today);
+  currentFriday.setDate(today.getDate()-((todayDow-5+7)%7));
+  const oldestFriday=new Date(currentFriday);
+  oldestFriday.setDate(currentFriday.getDate()-(8*7));
+
+  const worked=dates().filter(d=>{
+    if(!shiftFor(profile.id,d))return false;
+    const dt=parse(d);
+    const dow=dt.getDay();
+    const fri=new Date(dt);
+    fri.setDate(dt.getDate()-((dow-5+7)%7));
+    return fri>=oldestFriday;
+  });
+
   if(!worked.length){
     $('mineCards').innerHTML='<div class="empty">No generated shifts. Set up your rota pattern first.</div>';
     return;
   }
+
   const groups={};
   worked.forEach(d=>{
     const dt=parse(d);
@@ -35,9 +59,11 @@ function renderMine(){
     const key=iso(fri);
     (groups[key]??=[]).push(d);
   });
+
   $('mineCards').innerHTML=Object.keys(groups).sort().map(fri=>{
     const friDate=parse(fri);
     const thu=new Date(friDate);thu.setDate(friDate.getDate()+6);
+    const isPrevious=friDate<currentFriday;
     const ref=refs[profile.id];
     let weekLabel='';
     if(ref){
@@ -46,9 +72,10 @@ function renderMine(){
       const wn=((Number(ref.week_no)-1+diff)%13+13)%13+1;
       weekLabel=`Rota Week ${wn} · `;
     }
-    const cards=groups[fri].map(d=>`<div class="card"><div class="date">${disp(d)} · ${day(parse(d))}</div><h3>${esc(shiftFor(profile.id,d))}</h3><label>Status <select class="status-select" data-status="${d}"><option value="">Available</option>${['AL','TR','OD'].map(x=>`<option ${statusOf(profile.id,d)===x?'selected':''}>${x}</option>`).join('')}</select></label>${coverOf(profile.id,d)?`<p><strong>Covered by ${esc(name(coverOf(profile.id,d)))}</strong></p>`:''}</div>`).join('');
-    return `<div class="rota-week-row"><div class="rota-week-heading"><strong>${weekLabel}${disp(fri)} → ${disp(iso(thu))}</strong></div><div class="cards">${cards}</div></div>`;
+    const cards=groups[fri].map(d=>`<div class="card${isPrevious?' previous-shift':''}"><div class="date">${disp(d)} · ${day(parse(d))}</div><h3>${esc(shiftFor(profile.id,d))}</h3><label>Status <select class="status-select" data-status="${d}"><option value="">Available</option>${['AL','TR','OD'].map(x=>`<option ${statusOf(profile.id,d)===x?'selected':''}>${x}</option>`).join('')}</select></label>${coverOf(profile.id,d)?`<p><strong>Covered by ${esc(name(coverOf(profile.id,d)))}</strong></p>`:''}</div>`).join('');
+    return `<div class="rota-week-row${isPrevious?' previous-week':''}"><div class="rota-week-heading"><strong>${weekLabel}${disp(fri)} → ${disp(iso(thu))}</strong>${isPrevious?' <span class="past-label">Previous</span>':''}</div><div class="cards">${cards}</div></div>`;
   }).join('');
+
   document.querySelectorAll('[data-status]').forEach(x=>x.onchange=()=>setStatus(x.dataset.status,x.value));
 }
 function renderCover(){if(!profile)return;let a=[];for(let d of dates())for(let p of people){let st=statusOf(p.id,d),cv=coverOf(p.id,d);if(p.id!==profile.id&&st&&shiftFor(p.id,d)){if(!cv)a.push(`<div class="card"><div class="date">${disp(d)} · ${day(parse(d))}</div><h3>${esc(shiftFor(p.id,d))} — ${esc(p.display_name)}</h3><p>Status: <strong>${st}</strong></p><button class="volunteer" data-vol="${p.id}|${d}">VOLUNTEER</button></div>`);else if(cv===profile.id)a.push(`<div class="card"><div class="date">${disp(d)}</div><h3>Covering ${esc(p.display_name)} — ${esc(shiftFor(p.id,d))}</h3><button class="withdraw" data-with="${p.id}|${d}">UN-VOLUNTEER</button></div>`)}}$('coverCards').innerHTML=a.join('')||'<div class="empty">No shifts currently require cover.</div>';document.querySelectorAll('[data-vol]').forEach(b=>b.onclick=()=>coverAction('volunteer_shift',b.dataset.vol));document.querySelectorAll('[data-with]').forEach(b=>b.onclick=()=>coverAction('withdraw_cover',b.dataset.with))}
