@@ -10,6 +10,51 @@
 .previous-week .rota-week-heading{background:#ededed}
 .past-label{font-size:.78em;font-weight:600;margin-left:8px;color:#666}
 
+
+/* Compact My Shifts layout: eight rota weeks across on desktop */
+#minePage #mineCards{
+  display:grid;
+  grid-template-columns:repeat(8,minmax(0,1fr));
+  gap:8px;
+  align-items:start;
+}
+#minePage .rota-week-row{margin:0;min-width:0}
+#minePage .rota-week-heading{
+  padding:6px 5px;
+  margin-bottom:5px;
+  font-size:11px;
+  line-height:1.2;
+  border-left-width:3px;
+}
+#minePage .rota-week-row>.cards{
+  display:flex;
+  flex-direction:column;
+  gap:5px;
+}
+#minePage .card{
+  padding:7px 6px;
+  min-width:0;
+  border-radius:7px;
+  font-size:11px;
+}
+#minePage .card .date{font-size:10px;line-height:1.15}
+#minePage .card h3{font-size:13px;margin:3px 0 5px}
+#minePage .card label{font-size:10px}
+#minePage .status-select{
+  width:100%;
+  min-width:0;
+  padding:4px 2px;
+  font-size:11px;
+}
+#minePage .card p{font-size:10px;margin:5px 0 0}
+#minePage .past-label{display:block;margin:2px 0 0;font-size:9px}
+@media(max-width:1100px){
+  #minePage #mineCards{grid-template-columns:repeat(4,minmax(0,1fr))}
+}
+@media(max-width:650px){
+  #minePage #mineCards{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+
 </style></head><body><main class="app"><header class="topbar"><div class="brand">Cambrian Team Rota</div><nav id="tabs" class="tabs"><button class="tab active" data-page="calendar">Calendar</button></nav><div class="session"><span id="who">Public view</span><button id="loginBtn" class="primary">Login</button><button id="logoutBtn" class="logout hidden">Logout</button></div></header><div id="notice" class="notice bad">Database not configured. Use Setup to connect this app to Supabase. <button id="setupBtn" class="secondary">Setup</button></div>
 <section id="calendarPage" class="panel"><div class="panel-head"><div><div class="panel-title">Team Calendar</div><div class="panel-sub">Public read-only calendar · Friday–Thursday rota weeks</div></div><div><span class="pill">AL Annual Leave</span> <span class="pill">TR Training</span> <span class="pill">OD Other Duties</span></div></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>Day</th><th>06:00–18:00</th><th>18:00–06:00</th><th>Spare Days</th><th>Spare Nights</th><th>Status / Cover</th></tr></thead><tbody id="calendarBody"></tbody></table></div></section>
 <section id="minePage" class="panel hidden"><div class="panel-head"><div><div class="panel-title">My Shifts</div><div class="panel-sub">Set AL / TR / OD on your own rostered shifts</div></div></div><div id="mineCards" class="cards"></div></section>
