@@ -55,6 +55,14 @@
   #minePage #mineCards{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 
+
+/* My Shifts uses the same shift colours as Calendar */
+#minePage .shift-day{background:#eef7ee}
+#minePage .shift-night{background:#eef3fb}
+#minePage .shift-spare{background:#fff7e8}
+/* Once the rota week is completed, grey overrides the shift colour */
+#minePage .previous-shift{background:#e3e3e3!important}
+
 </style></head><body><main class="app"><header class="topbar"><div class="brand">Cambrian Team Rota</div><nav id="tabs" class="tabs"><button class="tab active" data-page="calendar">Calendar</button></nav><div class="session"><span id="who">Public view</span><button id="loginBtn" class="primary">Login</button><button id="logoutBtn" class="logout hidden">Logout</button></div></header><div id="notice" class="notice bad">Database not configured. Use Setup to connect this app to Supabase. <button id="setupBtn" class="secondary">Setup</button></div>
 <section id="calendarPage" class="panel"><div class="panel-head"><div><div class="panel-title">Team Calendar</div><div class="panel-sub">Public read-only calendar · Friday–Thursday rota weeks</div></div><div><span class="pill">AL Annual Leave</span> <span class="pill">TR Training</span> <span class="pill">OD Other Duties</span></div></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>Day</th><th>06:00–18:00</th><th>18:00–06:00</th><th>Spare Days</th><th>Spare Nights</th><th>Status / Cover</th></tr></thead><tbody id="calendarBody"></tbody></table></div></section>
 <section id="minePage" class="panel hidden"><div class="panel-head"><div><div class="panel-title">My Shifts</div><div class="panel-sub">Set AL / TR / OD on your own rostered shifts</div></div></div><div id="mineCards" class="cards"></div></section>
@@ -117,7 +125,7 @@ function renderMine(){
       const wn=((Number(ref.week_no)-1+diff)%13+13)%13+1;
       weekLabel=`Rota Week ${wn} · `;
     }
-    const cards=groups[fri].map(d=>`<div class="card${isPrevious?' previous-shift':''}"><div class="date">${disp(d)} · ${day(parse(d))}</div><h3>${esc(shiftFor(profile.id,d))}</h3><label>Status <select class="status-select" data-status="${d}"><option value="">Available</option>${['AL','TR','OD'].map(x=>`<option ${statusOf(profile.id,d)===x?'selected':''}>${x}</option>`).join('')}</select></label>${coverOf(profile.id,d)?`<p><strong>Covered by ${esc(name(coverOf(profile.id,d)))}</strong></p>`:''}</div>`).join('');
+    const cards=groups[fri].map(d=>{const shift=shiftFor(profile.id,d);const shiftClass=shift==='Day'?' shift-day':shift==='Night'?' shift-night':' shift-spare';return `<div class="card${shiftClass}${isPrevious?' previous-shift':''}"><div class="date">${disp(d)} · ${day(parse(d))}</div><h3>${esc(shift)}</h3><label>Status <select class="status-select" data-status="${d}"><option value="">Available</option>${['AL','TR','OD'].map(x=>`<option ${statusOf(profile.id,d)===x?'selected':''}>${x}</option>`).join('')}</select></label>${coverOf(profile.id,d)?`<p><strong>Covered by ${esc(name(coverOf(profile.id,d)))}</strong></p>`:''}</div>`}).join('');
     return `<div class="rota-week-row${isPrevious?' previous-week':''}"><div class="rota-week-heading"><strong>${weekLabel}${disp(fri)} → ${disp(iso(thu))}</strong>${isPrevious?' <span class="past-label">Previous</span>':''}</div><div class="cards">${cards}</div></div>`;
   }).join('');
 
