@@ -101,7 +101,7 @@
 </style></head><body><main class="app"><header class="topbar"><div class="brand">Cambrian Team Rota</div><nav id="tabs" class="tabs"><button class="tab active" data-page="calendar">Calendar</button></nav><div class="session"><span id="who">Public view</span><button id="loginBtn" class="primary">Login</button><button id="logoutBtn" class="logout hidden">Logout</button></div></header><div id="notice" class="notice bad">Connecting to shared database...</div>
 <section id="calendarPage" class="panel"><div class="panel-head"><div><div class="panel-title">Team Calendar</div><div class="panel-sub">Public read-only calendar · Friday–Thursday rota weeks</div></div><div><span class="pill">AL Annual Leave</span> <span class="pill">TR Training</span> <span class="pill">OD Other Duties</span></div></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>Day</th><th>06:00–18:00</th><th>18:00–06:00</th><th>Spare Days</th><th>Spare Nights</th><th>Status / Cover</th><th class="shared-head">Shared<br>Info</th></tr></thead><tbody id="calendarBody"></tbody></table></div></section>
 <section id="sharedPage" class="panel hidden"><div class="panel-head"><div><div class="panel-title">Shared Information</div><div class="panel-sub">Operational notes shared between logged-in team members</div></div><div class="shared-date-tools"><label><strong>Date:</strong> <input id="sharedDate" class="form-control" type="date"></label><button id="sharedLoad" class="secondary">View Date</button></div></div><div class="shared-info-wrap"><div id="sharedEntries"></div><div class="shared-add"><label for="sharedText"><strong>Add information for this date</strong></label><textarea id="sharedText" maxlength="2000" placeholder="Enter shared information..."></textarea><button id="sharedAdd" class="primary">Post Information</button></div></div></section>
-<section id="minePage" class="panel hidden"><div class="panel-head"><div><div class="panel-title">My Shifts</div><div class="panel-sub">Set AL / TR / OD on your own rostered shifts</div></div></div><div id="mineCards" class="cards"></div></section>
+<section id="minePage" class="panel hidden"><div class="panel-head"><div><div class="panel-title">My Shifts</div><div class="panel-sub">Set AL / TR / OD on your own rostered shifts</div><div id="myStatusTotals" class="status-totals"></div></div></div><div id="mineCards" class="cards"></div></section>
 <section id="coverPage" class="panel hidden"><div class="panel-head"><div><div class="panel-title">Available Cover</div><div class="panel-sub">Volunteer once; the database locks the vacancy to the first successful volunteer</div></div></div><div id="coverCards" class="cards"></div></section>
 <section id="setupPage" class="panel hidden"><div class="panel-head"><div><div class="panel-title">My Rota Setup</div><div class="panel-sub">Enter your 13-week repeating pattern and choose the rota week for a Friday</div></div><button id="savePattern" class="primary">Save Rota</button></div><div class="setup-grid"><div style="margin-bottom:12px"><label><strong>Reference Friday:</strong> <input id="refFriday" class="form-control" type="date"></label> <label><strong>Week number:</strong> <select id="refWeek" class="week-select"></select></label></div><table><thead><tr><th>Week</th><th>Shift</th><th>Days worked</th></tr></thead><tbody id="patternBody"></tbody></table></div></section>
 <section id="historyPage" class="panel hidden"><div class="panel-head"><div><div class="panel-title">History</div><div class="panel-sub">Status, cover and rota changes</div></div></div><div id="historyList" class="history"></div></section>
@@ -125,6 +125,13 @@ function annualStatusCounts(person,year){
 }
 function renderMine(){
   if(!profile)return;
+
+  const summaryYear=new Date().getFullYear();
+  const summary=annualStatusCounts(profile.id,summaryYear);
+  const me=people.find(x=>x.id===profile.id);
+  const allowance=Number(me?.al_allowance||0);
+  const totalsBox=$('myStatusTotals');
+  if(totalsBox)totalsBox.innerHTML=`<strong>${summaryYear} totals:</strong> &nbsp; AL <strong>${summary.AL}</strong> / ${allowance} allowance (${allowance-summary.AL} remaining) &nbsp; | &nbsp; TR <strong>${summary.TR}</strong> &nbsp; | &nbsp; OD <strong>${summary.OD}</strong>`;
 
   const today=new Date();today.setHours(0,0,0,0);
   const todayDow=today.getDay();
