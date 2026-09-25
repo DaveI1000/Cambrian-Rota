@@ -113,7 +113,16 @@ async function loadPublic(){if(!sb)return;const reqs=[['profiles',sb.from('profi
 function name(id){return people.find(p=>p.id===id)?.display_name||'Unknown'}function rotaCell(date,type){let arr=[];for(let p of people){let sh=shiftFor(p.id,date);if(sh===type){let st=statusOf(p.id,date),cv=coverOf(p.id,date);arr.push(`<div>${esc(p.display_name)}${st?` <strong>(${st})</strong>`:''}${cv?` → <strong>${esc(name(cv))}</strong>`:''}</div>`)}}return arr.join('')}function statusCell(date){let a=[];for(let p of people){let st=statusOf(p.id,date),sh=shiftFor(p.id,date);if(st&&sh){let isSpare=String(sh).trim().toLowerCase().startsWith('spare'),cv=coverOf(p.id,date);if(!isSpare)a.push(`<div class="${cv?'covered':'need'}">${esc(p.display_name)}-${st}-${cv?'Covered by '+esc(name(cv)):'Cover Required'}</div>`)}}return a.join('')}
 function sharedCount(date){return +(sharedInfo.find(x=>x.info_date===date)?.entry_count||0)}
 function renderCalendar(){let h='';for(let d of dates()){let cnt=sharedCount(d),flag=cnt?`<button class="info-flag ${profile?'clickable':''}" ${profile?`data-info-date="${d}" title="${cnt} shared information ${cnt===1?'entry':'entries'}"`:'title="Shared information exists — log in to view"'}>⚑</button>`:'';h+=`<tr class="${day(parse(d))==='Fri'?'week-start':''}"><td>${disp(d)}</td><td>${day(parse(d))}</td><td class="day">${rotaCell(d,'Day')}</td><td class="night">${rotaCell(d,'Night')}</td><td class="spare">${rotaCell(d,'Spare')}</td><td class="spare">${rotaCell(d,'Spare Night')}</td><td class="status">${statusCell(d)}</td><td class="shared-cell">${flag}</td></tr>`}$('calendarBody').innerHTML=h;document.querySelectorAll('[data-info-date]').forEach(b=>b.onclick=()=>openSharedDate(b.dataset.infoDate))}
-function annualStatusCounts(person,year){let c={AL:0,TR:0,OD:0};for(const [key,val] of Object.entries(statuses)){const [pid,d]=key.split('|');if(pid!==person||!d.startsWith(String(year)))continue;const sh=shiftFor(person,d);if(!['Day','Night','Spare','Spare Night'].includes(sh))continue;if(c[val]!==undefined)c[val]++}return c}
+function annualStatusCounts(person,year){
+  let c={AL:0,TR:0,OD:0};
+  let d=new Date(year,0,1),end=new Date(year,11,31);
+  while(d<=end){
+    let ds=iso(d),st=statusOf(person,ds),sh=shiftFor(person,ds);
+    if(['Day','Night','Spare','Spare Night'].includes(sh)&&c[st]!==undefined)c[st]++;
+    d=add(d,1);
+  }
+  return c;
+}
 function renderMine(){
   if(!profile)return;
 
