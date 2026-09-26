@@ -117,7 +117,7 @@ function annualStatusCounts(person,year){
   let c={AL:0,TR:0,OD:0};
   let d=new Date(year,0,1),end=new Date(year,11,31);
   while(d<=end){
-    let ds=iso(d),st=statusOf(person,ds),sh=shiftFor(person,ds);
+    const ds=iso(d),st=statusOf(person,ds),sh=shiftFor(person,ds);
     if(['Day','Night','Spare','Spare Night'].includes(sh)&&c[st]!==undefined)c[st]++;
     d=add(d,1);
   }
@@ -131,7 +131,7 @@ function renderMine(){
   const me=people.find(x=>x.id===profile.id);
   const allowance=Number(me?.al_allowance||0);
   const totalsBox=$('myStatusTotals');
-  if(totalsBox)totalsBox.innerHTML=`<strong>${summaryYear} totals:</strong> &nbsp; AL <strong>${summary.AL}</strong> / ${allowance} allowance (${allowance-summary.AL} remaining) &nbsp; | &nbsp; TR <strong>${summary.TR}</strong> &nbsp; | &nbsp; OD <strong>${summary.OD}</strong>`;
+  if(totalsBox) totalsBox.innerHTML=`<strong>${summaryYear} totals:</strong> &nbsp; AL <strong>${summary.AL}</strong> / ${allowance} allowance (${allowance-summary.AL} remaining) &nbsp; | &nbsp; TR <strong>${summary.TR}</strong> &nbsp; | &nbsp; OD <strong>${summary.OD}</strong>`;
 
   const today=new Date();today.setHours(0,0,0,0);
   const todayDow=today.getDay();
