@@ -296,22 +296,40 @@ async function tsExcel(){
  const end=parse(tsAddDays(tsWeek,6));
  const digits=[pad(end.getDate()),pad(end.getMonth()+1),String(end.getFullYear()).slice(-2)].join('');
  ['BA','BB','BC','BD','BE','BF'].forEach((col,i)=>put(col+'6',Number(digits[i])));
- for(let i=0;i<7;i++){const base=12+3*i;put('L'+base,null);put('P'+base,null);put('AI'+(base+1),null)}
- let worked=0;
+ // The template's entry cells are on the SECOND row of each day's three-row block.
+ // Remove every sample entry, including booked-on/off times and leave codes.
+ for(let i=0;i<7;i++){
+   const dayRow=12+3*i;
+   for(const row of [dayRow,dayRow+1,dayRow+2]){
+     for(const col of ['L','P','R','V','Z','AD','AH','AI'])put(col+row,null);
+   }
+ }
+ let rostered=0,worked=0;
  for(const x of tsItems){
    const i=Math.round((parse(x.date)-parse(tsWeek))/86400000);
    if(i<0||i>6)continue;
-   const row=12+3*i;
+   const row=13+3*i; // Hours and booked times belong here, not on the day-name row.
+   const roster=Number(x.rosteredHours)||0;
    const hours=x.status==='AL'?0:Number(x.hours)||0;
-   worked+=hours;
-   const previous=Number(getCell('L'+row).getElementsByTagNameNS(ns,'v')[0]?.textContent)||0;
-   put('L'+row,previous+hours/24);
+   rostered+=roster;worked+=hours;
+   const prior=Number(getCell('L'+row).getElementsByTagNameNS(ns,'v')[0]?.textContent)||0;
+   put('L'+row,prior+roster/24);
    if(x.status==='AL')put('P'+row,'AL');
    else if(x.status==='TR')put('P'+row,'TC');
    else if(x.status==='OD')put('P'+row,'OD');
+   // The sheet has separate Time Booked ON and OFF fields.
+   // Day/spare-day starts at 06:00; night/spare-night at 18:00.
+   // Enter the end time using the actual hours worked, including overnight shifts.
+   if(hours>0 && x.status!=='AL'){
+     const start=(x.shift==='Night'||x.shift==='Spare Night')?18:6;
+     const end=(start+hours)%24;
+     if(!getCell('R'+row).getElementsByTagNameNS(ns,'v').length)put('R'+row,start/24);
+     put('V'+row,end/24);
+   }
  }
  const overtime=Math.max(0,worked-35);
- put('L33',worked/24);put('AI33',overtime/24);put('AH33',overtime/24);
+ // Preserve the template's SUM formulas for rostered and overtime totals.
+ // Individual day values are written into the template's existing time-formatted cells.
  zip.file('xl/worksheets/sheet1.xml',new XMLSerializer().serializeToString(doc));
  return await zip.generateAsync({type:'uint8array',compression:'DEFLATE'});
 }function tsDownload(bytes){let a=document.createElement('a'),url=URL.createObjectURL(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));a.href=url;a.download='Timesheet_'+tsWeek+'_'+profile.display_name.replace(/[^a-z0-9_-]+/gi,'_')+'.xlsx';a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)}
