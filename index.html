@@ -77,6 +77,12 @@
 #minePage .compact-withdraw{padding:4px 5px;font-size:9px;width:100%}
 
 #timesheetPage .ts-controls{display:flex;gap:12px;flex-wrap:wrap;padding:12px;align-items:end}#timesheetPage label{display:flex;flex-direction:column;gap:5px;font-weight:700;font-size:13px}#timesheetPage input,#timesheetPage select{padding:8px;border:1px solid #98a2b3;border-radius:6px;min-width:90px}#timesheetPage .ts-total{display:flex;gap:20px;padding:14px;font-size:17px;flex-wrap:wrap}#timesheetPage .ts-actions{padding:12px;display:flex;gap:12px;flex-wrap:wrap}#timesheetPage table{min-width:750px}#timesheetPage td input{width:100px}#tsMessage{padding:10px;font-weight:700}
+
+/* Timesheet recipient rows: match admin list, overriding generic timesheet form labels */
+#timesheetPage #tsRecipientChecks .ts-recipient-row{display:flex;flex-direction:row;align-items:center;justify-content:flex-start;text-align:left;gap:16px;width:100%;padding:14px 16px;margin:10px 0;border:1px solid #a6b5c1;border-radius:8px;background:#fff;font-size:16px;font-weight:400;cursor:pointer}
+#timesheetPage #tsRecipientChecks .ts-recipient-row input[type="checkbox"]{appearance:auto;-webkit-appearance:checkbox;display:block;flex:0 0 22px;width:22px;height:22px;min-width:22px;margin:0;padding:0;cursor:pointer}
+#timesheetPage #tsRecipientChecks .ts-recipient-text{display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:4px;font-size:16px;line-height:1.35;overflow-wrap:anywhere}
+#timesheetPage #tsRecipientChecks .ts-recipient-text strong{font-size:17px}
 </style></head><body><main class="app"><header class="topbar"><div class="brand">Cambrian Team Rota</div><nav id="tabs" class="tabs"><button class="tab active" data-page="calendar">Calendar</button></nav><div class="session"><span id="who">Public view</span><button id="loginBtn" class="primary">Login</button><button id="logoutBtn" class="logout hidden">Logout</button></div></header><div id="notice" class="notice bad">Connecting to shared database...</div>
 <section id="calendarPage" class="panel"><div class="panel-head"><div><div class="panel-title">Team Calendar</div><div class="panel-sub">Public read-only calendar · Friday–Thursday rota weeks</div></div><div><span class="pill">AL Annual Leave</span> <span class="pill">TR Training</span> <span class="pill">OD Other Duties</span></div></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>Day</th><th>06:00–18:00</th><th>18:00–06:00</th><th>Spare Days</th><th>Spare Nights</th><th>Status / Cover</th></tr></thead><tbody id="calendarBody"></tbody></table></div></section>
 <section id="minePage" class="panel hidden"><div class="panel-head"><div><div class="panel-title">My Shifts</div><div class="panel-sub">Set AL / TR / OD on your own rostered shifts</div></div></div><div id="mineCards" class="cards"></div></section>
@@ -259,7 +265,7 @@ async function tsLoadRecipients(){
  const {data,error}=await sb.from('timesheet_recipients').select('id,display_name,email').order('display_name');
  if(error){box.textContent='Could not load recipients: '+error.message;return}
  tsRecipients=data||[];
- box.innerHTML=tsRecipients.length?tsRecipients.map(r=>`<label style="display:flex;align-items:center;gap:10px;padding:10px 12px;margin:8px 0;border:1px solid #a6b5c1;border-radius:8px;font-weight:normal;cursor:pointer"><input type="checkbox" value="${esc(r.id)}" style="min-width:auto;flex-shrink:0"><span><strong>${esc(r.display_name)}</strong> ${esc(r.email)}</span></label>`).join(''):'No additional recipients configured. A copy will still be sent to your registered email address.';
+ box.innerHTML=tsRecipients.length?tsRecipients.map(r=>`<label class="ts-recipient-row"><input type="checkbox" value="${esc(r.id)}"><span class="ts-recipient-text"><strong>${esc(r.display_name)}</strong><span>${esc(r.email)}</span></span></label>`).join(''):'No additional recipients configured. A copy will still be sent to your registered email address.';
 }
 async function tsRecipientAdminCall(body){
  const {data:{session:s}}=await sb.auth.getSession();if(!s)throw Error('Please log in again');
