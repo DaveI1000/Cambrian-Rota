@@ -90,7 +90,7 @@
 <section id="setupPage" class="panel hidden"><div class="panel-head"><div><div class="panel-title">My Rota Setup</div><div class="panel-sub">Enter your 13-week repeating pattern and choose the rota week for a Friday</div></div><button id="savePattern" class="primary">Save Rota</button></div><div class="setup-grid"><div style="margin-bottom:12px"><label><strong>Reference Friday:</strong> <input id="refFriday" class="form-control" type="date"></label> <label><strong>Week number:</strong> <select id="refWeek" class="week-select"></select></label></div><table><thead><tr><th>Week</th><th>Shift</th><th>Days worked</th></tr></thead><tbody id="patternBody"></tbody></table></div></section>
 <section id="timesheetPage" class="panel hidden"><div class="panel-head"><div><div class="panel-title">My Timesheet</div><div class="panel-sub">Friday–Thursday · individual rota · minimum worked shift 6 hours · overtime above 35 hours</div></div></div><div class="ts-controls"><label>Week starting Friday<input id="tsFriday" type="date"></label><button id="tsLoad" class="secondary">Load week</button><label>Day default hours<input id="tsDefDay" type="number" min="6" max="24" step="0.25" value="12"></label><label>Night default hours<input id="tsDefNight" type="number" min="6" max="24" step="0.25" value="12"></label><label>Spare Day default<input id="tsDefSpare" type="number" min="6" max="24" step="0.25" value="12"></label><label>Spare Night default<input id="tsDefSpareNight" type="number" min="6" max="24" step="0.25" value="12"></label><button id="tsSaveDefaults" class="secondary">Save defaults</button></div><div class="table-wrap"><table><thead><tr><th>Date</th><th>Shift</th><th>Status</th><th>Rostered hours</th><th>Hours worked (0 if not worked)</th></tr></thead><tbody id="tsRows"></tbody></table></div><div class="ts-total"><strong id="tsTotal">Total rostered hours: 0</strong><strong id="tsAL">Annual Leave hours: 0</strong><strong id="tsWorked">Hours worked: 0</strong><strong id="tsOvertime">Overtime (over 35 worked hours): 0</strong></div><section class="ts-recipient-box" style="margin:20px 0;padding:16px;border:1px solid #a6b5c1;border-radius:8px"><h3>Timesheet Email Recipients</h3><p>Your registered email address automatically receives a copy. Tick any additional recipients below.</p><div id="tsRecipientChecks" style="margin-top:12px">Loading recipients...</div></section><div class="ts-actions"><button id="tsSave" class="secondary">Save draft</button><button id="tsExport" class="primary">Download Excel</button><button id="tsSend" class="primary">Email timesheet</button></div><div id="tsMessage" aria-live="polite"></div></section><section id="historyPage" class="panel hidden"><div class="panel-head"><div><div class="panel-title">History</div><div class="panel-sub">Status, cover and rota changes</div></div></div><div id="historyList" class="history"></div></section>
 <section id="adminPage" class="panel hidden"><div class="panel-head"><div><div class="panel-title">Administration</div><div class="panel-sub">Create users, set access level and reset passwords</div></div><button id="newUser" class="primary">New User</button></div><div id="userList" class="admin-grid"></div><section style="margin:20px 0;padding:16px;border:1px solid #a6b5c1;border-radius:8px"><h3>Timesheet Email Recipients</h3><p>Only administrators can add, edit or remove these addresses. Users select recipients using checkboxes on their Timesheet page.</p><button id="tsAddRecipient" class="primary">Add Recipient</button><div id="tsAdminRecipients" style="margin-top:12px"></div></section></section></main><div id="modalBackdrop" class="modal-backdrop hidden"></div>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://cdn.jsdelivr.net/npm/xlsx-populate@1.21.0/browser/xlsx-populate.min.js"></script><script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script><script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script><script>
 (()=>{'use strict';const START='2026-09-24',END='2027-12-31',DAYS=['Fri','Sat','Sun','Mon','Tue','Wed','Thu'];const $=id=>document.getElementById(id);let cfg={url:'https://lrfkxyozkmlsnxinbfhf.supabase.co',key:localStorage.getItem('rota_key')||'sb_publishable_l-M-Pz-07R6VhB9NH-v9YQ_DkZ2Bxq7',adminFn:localStorage.getItem('rota_admin_fn')||'admin-users'};let sb=null,session=null,profile=null,people=[],patterns={},refs={},statuses={},covers={},history=[];const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const pad=n=>String(n).padStart(2,'0');function iso(d){return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`}function parse(s){let [y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)}function day(d){return ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()]}function disp(s){return parse(s).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}function dates(){let a=[],d=parse(START),e=parse(END);while(d<=e){a.push(iso(d));d.setDate(d.getDate()+1)}return a}function fridayOf(s){let d=parse(s),delta=(d.getDay()-5+7)%7;d.setDate(d.getDate()-delta);return iso(d)}function weeksBetween(a,b){return Math.round((parse(b)-parse(a))/604800000)}function weekNo(person,date){let r=refs[person];if(!r)return null;let n=((r.week_no-1+weeksBetween(r.ref_friday,fridayOf(date)))%13+13)%13+1;return n}function shiftFor(person,date){let w=weekNo(person,date);if(!w)return '';let p=(patterns[person]||{})[w];return p&&p.days.includes(day(parse(date)))?p.shift:''}function k(p,d){return p+'|'+d}function statusOf(p,d){return statuses[k(p,d)]||''}function coverOf(p,d){return covers[k(p,d)]||''}
 function configured(){return /^https:\/\//.test(cfg.url)&&cfg.key.length>20}function connect(){if(!configured())return false;sb=supabase.createClient(cfg.url,cfg.key);return true}function setNotice(ok,msg){$('notice').className='notice '+(ok?'good':'bad');$('notice').textContent=msg}
 async function loadPublic(){if(!sb)return;const reqs=[['profiles',sb.from('profiles').select('id,display_name,role,active').eq('active',true).order('display_name')],['rota_patterns',sb.from('rota_patterns').select('*')],['rota_reference',sb.from('rota_reference').select('*')],['rota_status',sb.from('rota_status').select('*')],['rota_cover',sb.from('rota_cover').select('*')]];const results=await Promise.all(reqs.map(async([name,q])=>{const r=await q;if(r.error)throw new Error(name+': '+r.error.message);return r}));const [pr,pa,re,st,cv]=results;people=pr.data||[];patterns={};for(let r of pa.data||[]){patterns[r.person_id]??={};patterns[r.person_id][r.week_no]={shift:r.shift_type,days:r.days||[]}}refs={};for(let r of re.data||[])refs[r.person_id]=r;statuses={};for(let r of st.data||[])statuses[k(r.person_id,r.shift_date)]=r.status_code;covers={};for(let r of cv.data||[])covers[k(r.rostered_person_id,r.shift_date)]=r.volunteer_id;render()}async function loadPrivate(){history=[];if(!session)return;let hi=await sb.from('rota_history').select('*').order('created_at',{ascending:false}).limit(500);if(hi.error)throw new Error('rota_history: '+hi.error.message);history=hi.data||[];render()}async function load(){await loadPublic();if(session)await loadPrivate()}
@@ -253,8 +253,68 @@ function tsTotals(){let rostered=tsItems.reduce((a,x)=>a+(Number(x.rosteredHours
 async function tsSaveWeek(submitted=false){tsValidate();let entries=tsItems.map(x=>({...x,hours:x.status==='AL'?0:Number(x.hours)}));let payload={user_id:profile.id,week_start:tsWeek,entries,updated_at:new Date().toISOString()};if(submitted)payload.submitted_at=new Date().toISOString();else if(tsSaved?.submitted_at)payload.submitted_at=tsSaved.submitted_at;let {error}=await sb.from('timesheet_weeks').upsert(payload,{onConflict:'user_id,week_start'});if(error)throw Error(error.message);tsSaved=payload}
 $('tsLoad').onclick=()=>tsLoadWeek();$('tsSaveDefaults').onclick=async()=>{try{let vals=['tsDefDay','tsDefNight','tsDefSpare','tsDefSpareNight'].map(id=>tsHours($(id).value));if(vals.some(x=>!Number.isFinite(x)||x<6||x>24))throw Error('Each default must be between 6 and 24 hours.');let {error}=await sb.from('timesheet_settings').upsert({user_id:profile.id,day_hours:vals[0],night_hours:vals[1],spare_hours:vals[2],spare_night_hours:vals[3]},{onConflict:'user_id'});if(error)throw Error(error.message);tsDefaults=vals;tsMsg('Defaults saved. Reload the week to apply them to new entries.')}catch(e){tsMsg(e.message)}};
 $('tsSave').onclick=async()=>{try{await tsSaveWeek();tsMsg('Draft saved for '+tsWeek)}catch(e){tsMsg(e.message)}};
-async function tsExcel(){tsValidate();if(typeof XlsxPopulate==='undefined')throw Error('Excel library did not load. Check your internet connection.');let res=await fetch('timesheet-template.xlsx');if(!res.ok)throw Error('Upload timesheet-template.xlsx alongside index.html on GitHub.');let book=await XlsxPopulate.fromDataAsync(await res.arrayBuffer());let sheet=book.sheet('Timesheet');if(!sheet)throw Error('Timesheet worksheet not found.');let other=book.sheet('Appropriation');if(other)book.deleteSheet(other);sheet.cell('G6').value(profile.display_name);sheet.cell('G35').value(profile.display_name);let end=parse(tsAddDays(tsWeek,6));let digits=[pad(end.getDate()),pad(end.getMonth()+1),String(end.getFullYear()).slice(-2)].join('');for(let i=0;i<6;i++)sheet.cell(['BA','BB','BC','BD','BE','BF'][i]+'6').value(Number(digits[i]));let all=tsItems.reduce((a,x)=>a+Number(x.hours),0),ot=Math.max(0,all-35);for(let i=0;i<7;i++){let base=12+3*i;sheet.cell('L'+base).value(null);sheet.cell('P'+base).value(null);sheet.cell('AI'+(base+1)).value(null)}for(let x of tsItems){let i=Math.round((parse(x.date)-parse(tsWeek))/86400000),r=12+3*i,h=Number(x.hours);if(i<0||i>6)continue;let prior=Number(sheet.cell('L'+r).value())||0;sheet.cell('L'+r).value((prior+h)/24);if(x.status==='AL')sheet.cell('P'+r).value('AL');else if(x.status==='TR')sheet.cell('P'+r).value('TC');else if(x.status==='OD')sheet.cell('P'+r).value('OD');}sheet.cell('L33').value(all/24);sheet.cell('AI33').value(ot/24);sheet.cell('AH33').value(ot/24);return new Uint8Array(await book.outputAsync('uint8array'))}
-function tsDownload(bytes){let a=document.createElement('a'),url=URL.createObjectURL(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));a.href=url;a.download='Timesheet_'+tsWeek+'_'+profile.display_name.replace(/[^a-z0-9_-]+/gi,'_')+'.xlsx';a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)}
+async function tsExcel(){
+ tsValidate();
+ if(typeof JSZip==='undefined')throw Error('Excel library did not load. Check your internet connection.');
+ const res=await fetch('timesheet-template.xlsx',{cache:'no-store'});
+ if(!res.ok)throw Error('Missing timesheet-template.xlsx. Upload it alongside index.html on GitHub.');
+ const zip=await JSZip.loadAsync(await res.arrayBuffer());
+ const sheetFile=zip.file('xl/worksheets/sheet1.xml');
+ if(!sheetFile)throw Error('The Excel template has no Timesheet worksheet.');
+ const xml=await sheetFile.async('string');
+ const doc=new DOMParser().parseFromString(xml,'application/xml');
+ if(doc.getElementsByTagName('parsererror').length)throw Error('Could not read the Excel template.');
+ const ns='http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+ const sheetData=doc.getElementsByTagNameNS(ns,'sheetData')[0];
+ if(!sheetData)throw Error('The Excel template is missing worksheet data.');
+ const child=(parent,tag)=>Array.from(parent.children).find(e=>e.localName===tag);
+ const getCell=(ref)=>{
+   let cell=Array.from(doc.getElementsByTagNameNS(ns,'c')).find(c=>c.getAttribute('r')===ref);
+   if(cell)return cell;
+   const rowNumber=Number(ref.match(/\d+$/)[0]);
+   let row=Array.from(sheetData.getElementsByTagNameNS(ns,'row')).find(r=>Number(r.getAttribute('r'))===rowNumber);
+   if(!row){row=doc.createElementNS(ns,'row');row.setAttribute('r',String(rowNumber));const next=Array.from(sheetData.children).find(r=>Number(r.getAttribute('r'))>rowNumber);sheetData.insertBefore(row,next||null)}
+   cell=doc.createElementNS(ns,'c');cell.setAttribute('r',ref);
+   const colNum=(s)=>s.split('').reduce((v,c)=>v*26+c.charCodeAt(0)-64,0);
+   const target=colNum(ref.match(/^[A-Z]+/)[0]);
+   const next=Array.from(row.children).find(c=>colNum((c.getAttribute('r')||'').match(/^[A-Z]+/)[0])>target);
+   row.insertBefore(cell,next||null);return cell;
+ };
+ const put=(ref,value)=>{
+   const cell=getCell(ref);
+   for(const node of Array.from(cell.children))if(['v','f','is'].includes(node.localName))cell.removeChild(node);
+   cell.removeAttribute('t');
+   if(value===null||value===undefined)return;
+   if(typeof value==='number'){
+     const v=doc.createElementNS(ns,'v');v.textContent=String(value);cell.appendChild(v);
+   }else{
+     cell.setAttribute('t','inlineStr');
+     const is=doc.createElementNS(ns,'is'),t=doc.createElementNS(ns,'t');t.textContent=String(value);is.appendChild(t);cell.appendChild(is);
+   }
+ };
+ put('G6',profile.display_name);put('G35',profile.display_name);
+ const end=parse(tsAddDays(tsWeek,6));
+ const digits=[pad(end.getDate()),pad(end.getMonth()+1),String(end.getFullYear()).slice(-2)].join('');
+ ['BA','BB','BC','BD','BE','BF'].forEach((col,i)=>put(col+'6',Number(digits[i])));
+ for(let i=0;i<7;i++){const base=12+3*i;put('L'+base,null);put('P'+base,null);put('AI'+(base+1),null)}
+ let worked=0;
+ for(const x of tsItems){
+   const i=Math.round((parse(x.date)-parse(tsWeek))/86400000);
+   if(i<0||i>6)continue;
+   const row=12+3*i;
+   const hours=x.status==='AL'?0:Number(x.hours)||0;
+   worked+=hours;
+   const previous=Number(getCell('L'+row).getElementsByTagNameNS(ns,'v')[0]?.textContent)||0;
+   put('L'+row,previous+hours/24);
+   if(x.status==='AL')put('P'+row,'AL');
+   else if(x.status==='TR')put('P'+row,'TC');
+   else if(x.status==='OD')put('P'+row,'OD');
+ }
+ const overtime=Math.max(0,worked-35);
+ put('L33',worked/24);put('AI33',overtime/24);put('AH33',overtime/24);
+ zip.file('xl/worksheets/sheet1.xml',new XMLSerializer().serializeToString(doc));
+ return await zip.generateAsync({type:'uint8array',compression:'DEFLATE'});
+}function tsDownload(bytes){let a=document.createElement('a'),url=URL.createObjectURL(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));a.href=url;a.download='Timesheet_'+tsWeek+'_'+profile.display_name.replace(/[^a-z0-9_-]+/gi,'_')+'.xlsx';a.click();setTimeout(()=>URL.revokeObjectURL(url),1500)}
 $('tsExport').onclick=async()=>{try{tsMsg('Preparing Excel...');let b=await tsExcel();tsDownload(b);tsMsg('Excel downloaded.')}catch(e){tsMsg(e.message)}};
 $('tsSend').onclick=async()=>{let btn=$('tsSend');try{if(!confirm('Email this timesheet for '+tsWeek+'?'))return;btn.disabled=true;tsMsg('Preparing and emailing...');let selected=[...document.querySelectorAll('#tsRecipientChecks input[type=checkbox]:checked')].map(x=>x.value);let b=await tsExcel();let {data:{session:s}}=await sb.auth.getSession();if(!s)throw Error('Log in again.');let filename='Timesheet_'+tsWeek+'.xlsx';let binary='';for(let i=0;i<b.length;i+=8192)binary+=String.fromCharCode(...b.subarray(i,i+8192));let r=await fetch(cfg.url+'/functions/v1/send-timesheet',{method:'POST',headers:{'Content-Type':'application/json',apikey:cfg.key,Authorization:'Bearer '+s.access_token},body:JSON.stringify({week_start:tsWeek,filename,attachment_base64:btoa(binary),recipient_ids:selected})});let result=await r.json().catch(()=>({}));if(!r.ok||!result.success)throw Error(result.error||result.message||'Email failed');await tsSaveWeek(true);tsMsg('Timesheet emailed to selected recipients and your registered email address.'+(result.warning?' '+result.warning:''))}catch(e){tsMsg('Not sent: '+e.message)}finally{btn.disabled=false}};
 
