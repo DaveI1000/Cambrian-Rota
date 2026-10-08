@@ -292,6 +292,10 @@ async function tsExcel(){
      const is=doc.createElementNS(ns,'is'),t=doc.createElementNS(ns,'t');t.textContent=String(value);is.appendChild(t);cell.appendChild(is);
    }
  };
+ // Never carry payroll or cost centre numbers over from the sample template.
+ for(const col of ['AA','AB','AC','AD','AE','AF','AL','AM','AN','AO','AP','AQ','AR'])put(col+'6',null);
+ // Update the rota week instead of retaining the sample template's week number.
+ put('BB4',weekNo(profile.id,tsWeek)||null);
  put('G6',profile.display_name);put('G35',profile.display_name);
  const end=parse(tsAddDays(tsWeek,6));
  const digits=[pad(end.getDate()),pad(end.getMonth()+1),String(end.getFullYear()).slice(-2)].join('');
